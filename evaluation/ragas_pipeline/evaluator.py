@@ -114,6 +114,24 @@ class RAGEvaluationResult:
 
 # ── LLM + Embedder setup for RAGAS ────────────────────────────────────────────
 
+class SingleGenerationGroq(ChatGroq):
+    """
+    Groq wrapper that caps n=1 for models that reject n>1.
+    RAGAS answer_relevancy sends n=3 by default to generate
+    multiple hypothetical questions. qwen3-32b rejects this.
+    This subclass forces n=1 on every call.
+
+    PROD (Azure OpenAI): supports n>1 natively, no wrapper needed.
+    """
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        kwargs.pop("n", None)  # remove n parameter entirely
+        return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        kwargs.pop("n", None)
+        return await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+
 def _get_ragas_llm() -> LangchainLLMWrapper:
     """
     Returns RAGAS-wrapped LLM for metric computation.
@@ -140,7 +158,9 @@ def _get_ragas_llm() -> LangchainLLMWrapper:
     if not api_key:
         raise ValueError("GROQ_API_KEY not set in .env")
 
-    llm = ChatGroq(
+    # DEMO: SingleGenerationGroq caps n=1 for models that reject n>1
+    # PROD (Azure OpenAI): use standard ChatOpenAI — supports n>1 natively
+    llm = SingleGenerationGroq(
         api_key=api_key,
         model=model,
         temperature=0,
@@ -253,10 +273,20 @@ def run_ragas_evaluation(
             metric.embeddings = ragas_embedder
 
     # Run evaluation
+    # RunConfig controls concurrency and timeout — critical for Groq free tier
+    # DEMO: max_workers=1 prevents rate limit timeouts on Groq free tier
+    # PROD: increase to max_workers=4 with Azure OpenAI which handles concurrency
+    from ragas import RunConfig
+    run_config = RunConfig(
+        max_workers=1,      # sequential to avoid Groq rate limits
+        timeout=120,        # 2 min per metric call
+        max_retries=3,
+    )
     try:
         results = evaluate(
             dataset=dataset,
             metrics=metrics,
+            run_config=run_config,
         )
     except Exception as e:
         logger.error(f"RAGAS evaluation failed: {e}")
@@ -292,3 +322,7 @@ def run_ragas_evaluation(
 
     logger.success(f"\n{result.summary()}")
     return result
+
+
+
+

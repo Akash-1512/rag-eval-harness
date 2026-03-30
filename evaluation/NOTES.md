@@ -49,3 +49,8 @@ tagged `# PROD (paid)` so switching is a one-line config change.
 - This is sufficient for: full RAGAS evaluation run (~200 LLM calls),
   full red-team run (~120 LLM calls), dashboard queries.
   Stay within limits by not running all three simultaneously.
+## Groq model selection (as of March 2026)
+llama-3.1-70b-versatile has been decommissioned by Groq.
+Current recommended model: qwen/qwen3-32b
+Check available models with:
+    python -c "from groq import Groq; import os; from dotenv import load_dotenv; load_dotenv(); [print(m.id) for m in Groq(api_key=os.getenv('GROQ_API_KEY')).models.list().data]"
