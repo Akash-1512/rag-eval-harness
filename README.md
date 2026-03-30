@@ -1,128 +1,231 @@
-# rag-eval-harness
+# 🚀 rag-eval-harness
 
-**Production-grade RAG Evaluation and Red-Teaming Platform**
+> **Production-grade RAG Evaluation & Red-Teaming Platform for LLM Applications**
 
-A self-service platform that ingests any real document corpus, runs comprehensive 
-RAG evaluation using RAGAS + DeepEval, and autonomously red-teams the system using 
-a LangGraph adversarial agent. Every evaluation run is tracked in MLflow.
-
-Built as a portfolio project and teaching resource — every design decision is 
-documented inline with production-scale alternatives.
-
----
-
-## Current State
-
-| Milestone | Status | Description |
-|-----------|--------|-------------|
-| M1 — Scaffold | ✅ Complete | Repo structure, environment, dependencies |
-| M2 — Ingestion | 🔜 Next | Document loading, 4 chunking strategies |
-| M3 — Retrieval | ⬜ Planned | FAISS index, hybrid retrieval |
-| M4 — RAG pipeline | ⬜ Planned | Query → retrieve → GPT-4o |
-| M5 — RAGAS | ⬜ Planned | 5 core evaluation metrics |
-| M6 — DeepEval | ⬜ Planned | G-Eval, custom metrics |
-| M7 — Red-Team | ⬜ Planned | LangGraph adversarial agent |
-| M8 — MLflow | ⬜ Planned | Experiment tracking |
-| M9 — FastAPI | ⬜ Planned | REST API backend |
-| M10 — Streamlit | ⬜ Planned | Evaluation dashboard |
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![LangChain](https://img.shields.io/badge/LangChain-0.3-green)
+![LangGraph](https://img.shields.io/badge/LangGraph-Agentic-orange)
+![MLflow](https://img.shields.io/badge/MLflow-Tracking-blueviolet)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
-## Corpus
+## 🧠 Why This Project Matters
 
-20 foundational AI/ML research papers (~780 pages total):
-- Transformers, BERT, GPT-3, LLaMA 1/2, RAG, Self-RAG, RAGAS, and more
-- All sourced from arXiv — publicly available, no IP concerns
-- Stored in `data/papers/` as numbered PDFs
+Most RAG systems in production are **never evaluated properly**.
 
-## Tech Stack
+They:
 
-| Layer | Technology |
-|-------|-----------|
-| LLM | Azure OpenAI GPT-4o |
-| Embeddings | text-embedding-3-large |
-| Vector store | FAISS (local) → Azure AI Search (prod) |
-| RAG framework | LangChain + LangGraph |
-| Evaluation | RAGAS + DeepEval + custom metrics |
-| Tracking | MLflow (local) → Azure ML (prod) |
-| API | FastAPI |
-| Dashboard | Streamlit |
-| CI/CD | GitHub Actions |
+* Ship without measuring hallucinations
+* Ignore retrieval failures
+* Lack adversarial testing
+* Have no experiment tracking
+
+👉 This project solves that.
+
+It is a **self-service evaluation harness** that lets teams:
+
+* Quantify RAG performance
+* Detect failure modes automatically
+* Compare design decisions (chunking, retrieval, etc.)
+* Track experiments like real ML systems
 
 ---
 
-## Setup
-```bat
-git clone https://github.com/Akash-1512/rag-eval-harness.git
-cd rag-eval-harness
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-copy .env.example .env
-# Fill in your Azure OpenAI credentials in .env
+## ⚡ What It Does
+
+Upload a document corpus + Q&A dataset → get **production-grade evaluation**
+
+### 🔍 Pipeline Overview
+
+1. 📄 Ingest PDFs with 4 chunking strategies
+2. 🔎 Perform hybrid retrieval (FAISS / Azure AI Search)
+3. 🤖 Generate answers using LLM
+4. 📊 Evaluate with **RAGAS (5 metrics)**
+5. 🧪 Run **DeepEval + custom metrics**
+6. 🛡️ Launch **LangGraph red-team agent (6 attack types)**
+7. 📈 Track experiments in **MLflow**
+8. 📊 Visualize results in **Streamlit dashboard**
+
+---
+
+## 🏗️ System Architecture
+
+```
+PDF Corpus → Chunking → Vector Store → RAG Pipeline
+                               │
+        ┌───────────────┬───────────────┬───────────────┐
+        ▼               ▼               ▼
+     RAGAS         DeepEval        Red-Team Agent
+   (5 metrics)    (G-Eval)        (LangGraph)
+        └───────────────┴───────────────┘
+                        ▼
+                  MLflow Tracking
+                        ▼
+                 Streamlit Dashboard
 ```
 
 ---
 
-## Repository Structure
+## 📊 Real Evaluation Insights
+
+| Metric             | Score | Insight              |
+| ------------------ | ----- | -------------------- |
+| Faithfulness       | 1.000 | No hallucinations    |
+| Context Precision  | 0.712 | Some retrieval noise |
+| Context Recall     | 0.833 | Good coverage        |
+| Answer Correctness | 0.530 | Missing definitions  |
+
+💡 **Key Insight:**
+Chunking strategy directly impacts retrieval quality.
+
+* Recursive chunking failed to retrieve split definitions
+* MLflow experiments captured this failure quantitatively
+* Confirms real-world issue: **retrieval ≠ solved problem**
+
+---
+
+## 🧪 Red-Team Testing (Unique Feature)
+
+Unlike typical RAG systems, this project includes **automated adversarial testing**
+
+### Attack Types
+
+* Version Confusion
+* Numerical Hallucination
+* Premise Injection
+* Cross-Document Contradiction
+* Out-of-Scope Queries
+* Temporal Errors
+
+👉 The agent **learns from failures and adapts attacks dynamically**
+
+---
+
+## ⚙️ Tech Stack
+
+| Layer      | Demo (Free)           | Production             |
+| ---------- | --------------------- | ---------------------- |
+| LLM        | Groq LLaMA 3          | Azure OpenAI GPT-4o    |
+| Embeddings | MiniLM                | text-embedding-3-large |
+| Vector DB  | FAISS                 | Azure AI Search        |
+| Framework  | LangChain + LangGraph | Same                   |
+| Eval       | RAGAS + DeepEval      | Same                   |
+| Tracking   | MLflow local          | Azure ML               |
+| UI         | Streamlit             | Streamlit              |
+
+---
+
+## 🧠 Key Design Decisions
+
+### 1. Chunking = Experiment Variable (Not Config)
+
+Each strategy creates its own index → tracked in MLflow
+➡️ Enables **quantitative comparison**
+
+---
+
+### 2. Evaluation is Multi-Layered
+
+* RAGAS → Retrieval + generation quality
+* DeepEval → LLM-based judgments
+* Custom → Abstention accuracy
+
+➡️ Covers **what single metric cannot**
+
+---
+
+### 3. Red-Teaming is First-Class
+
+Most systems:
+❌ Evaluate only "happy path"
+✅ This system actively **breaks itself**
+
+---
+
+### 4. Zero → Production Switch
+
+* Free stack for demo
+* Azure stack for production
+* Switch using `.env`
+
+---
+
+## 📂 Repository Structure
+
 ```
 rag-eval-harness/
-  ingestion/           # Document loading, 4 chunking strategies
-  retrieval/           # Vector index and hybrid retrieval
-  evaluation/
-    ragas_pipeline/    # RAGAS 5-metric evaluation
-    deepeval_tests/    # DeepEval assertions and G-Eval
-    custom_metrics/    # Abstention accuracy, numerical faithfulness
-  red_team/            # LangGraph adversarial agent
-  tracking/            # MLflow experiment configuration
-  ui/                  # Streamlit dashboard
-  api/                 # FastAPI backend
-  data/
-    papers/            # 20 AI/ML research PDFs
-    qa_pairs/          # Real Q&A CSV files
-  notebooks/           # Benchmark analysis
-  .github/workflows/   # CI/CD pipelines
+├── ingestion/        # Chunking strategies
+├── retrieval/        # Embeddings + FAISS
+├── evaluation/       # RAGAS + DeepEval
+├── red_team/         # LangGraph adversarial agent
+├── tracking/         # MLflow experiments
+├── api/              # RAG pipeline
+├── ui/               # Streamlit dashboard
+├── data/             # Papers + QA pairs
+└── tests/            # Unit tests
 ```
 
 ---
 
-## Teaching Philosophy
+## 🚀 Quick Start
 
-This repo is built as both a working system and a learning resource.
-Every folder contains a `NOTES.md` explaining:
-- Why this design decision was made
-- What breaks if you do it the naive way  
-- How this connects to the rest of the system
-- What changes at production scale (20,000+ documents)
+```bash
+git clone https://github.com/Akash-1512/rag-eval-harness.git
+cd rag-eval-harness
+
+python -m venv venv
+venv\Scripts\activate
+
+pip install -r requirements.txt
+copy .env.example .env
+```
+
+### Add your Groq API key
+
+```
+GROQ_API_KEY=your_key_here
+```
 
 ---
 
-## Downloading the corpus
+## ▶️ Run the System
 
-PDFs are not stored in this repository (binary files, ~780 pages total).
-Download each paper from arXiv and place in `data/papers/`:
+```bash
+# Ingestion
+python -m ingestion.smoke_test
 
-| File | arXiv URL |
-|------|-----------|
-| 01_attention_is_all_you_need.pdf | https://arxiv.org/abs/1706.03762 |
-| 02_bert.pdf | https://arxiv.org/abs/1810.04805 |
-| 03_gpt3.pdf | https://arxiv.org/abs/2005.14165 |
-| 04_llama.pdf | https://arxiv.org/abs/2302.13971 |
-| 05_llama2.pdf | https://arxiv.org/abs/2307.09288 |
-| 06_rag.pdf | https://arxiv.org/abs/2005.11401 |
-| 07_self_rag.pdf | https://arxiv.org/abs/2310.11511 |
-| 08_ragas.pdf | https://arxiv.org/abs/2309.15217 |
-| 09_instructgpt_rlhf.pdf | https://arxiv.org/abs/2203.02155 |
-| 10_constitutional_ai.pdf | https://arxiv.org/abs/2212.08073 |
-| 11_chain_of_thought_prompting.pdf | https://arxiv.org/abs/2201.11903 |
-| 12_react.pdf | https://arxiv.org/abs/2210.03629 |
-| 13_hyde.pdf | https://arxiv.org/abs/2212.10496 |
-| 14_lost_in_the_middle.pdf | https://arxiv.org/abs/2307.03172 |
-| 15_mixtral_of_experts.pdf | https://arxiv.org/abs/2401.04088 |
-| 16_mistral_7b.pdf | https://arxiv.org/abs/2310.06825 |
-| 17_flare.pdf | https://arxiv.org/abs/2305.06983 |
-| 18_toolformer.pdf | https://arxiv.org/abs/2302.04761 |
-| 19_sparks_of_agi_gpt4_technical_report.pdf | https://arxiv.org/abs/2303.12528 |
-| 20_rag_survey.pdf | https://arxiv.org/abs/2312.10997 |
+# Retrieval
+python -m retrieval.smoke_test
 
-*Built by Akash Chaudhari — Agentic AI Engineer, Deloitte*
+# RAG pipeline
+python -m api.smoke_test
+
+# Evaluation
+python -m evaluation.ragas_pipeline.smoke_test
+```
+
+---
+
+## 📚 Dataset
+
+* 20 foundational AI/ML papers (~780 pages)
+* 10 real Q&A pairs
+* Fully non-synthetic evaluation
+
+---
+
+## 👨‍💻 Author
+
+**Akash Chaudhari**
+Agentic AI Engineer @ Deloitte
+
+* 🌐 [https://akashchaudhari.netlify.app](https://akashchaudhari.netlify.app)
+* 💼 [https://linkedin.com/in/akash1512](https://linkedin.com/in/akash1512)
+* 💻 [https://github.com/Akash-1512](https://github.com/Akash-1512)
+
+---
+
+## ⭐ Support
+
+If you found this useful, consider giving it a star ⭐
