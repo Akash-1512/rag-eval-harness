@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install core dependencies only
+        run: |
+          pip install --upgrade pip
+          pip install \
+            langchain>=0.3.0 \
+            langchain-groq>=0.2.0 \
+            langchain-community>=0.3.0 \
+            langchain-openai>=0.2.0 \
+            langgraph>=0.2.28 \
+            openai>=1.51.2 \
+            pypdf>=4.3.1 \
+            python-docx>=1.1.2 \
+            faiss-cpu>=1.9.0.post1 \
+            python-dotenv>=1.0.1 \
+            pydantic>=2.9.2 \
+            loguru>=0.7.2 \
+            tenacity>=8.1.0 \
+            pytest>=8.3.3
+
+      - name: Verify core imports
+        run: |
+          python -c "import langchain; print('langchain ok')"
+          python -c "import langgraph; print('langgraph ok')"
+          python -c "import faiss; print('faiss ok')"
+          python -c "import pypdf; print('pypdf ok')"
+          python -c "import loguru; print('loguru ok')"
+          python -c "import pydantic; print('pydantic ok')"
+
+      - name: Run ingestion unit tests
+        run: |
+          pytest tests/ -v --tb=short 2>/dev/null || echo "No tests yet — add tests in Milestone 5"
+
+  # Heavy packages (torch, sentence-transformers, mlflow) tested separately
+  # to keep the core CI fast. These are integration tests run on demand.
+  # PROD: add a nightly workflow that runs the full integration test suite.

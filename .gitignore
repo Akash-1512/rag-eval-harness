@@ -1,0 +1,30 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Data
+mlruns/
+mlartifacts/
+data/indexes/
+data/papers/*.pdf
+data/qa_pairs/*.csv
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Build
+dist/
+build/
+*.egg-info/
+.ipynb_checkpoints/
+.streamlit/secrets.toml
