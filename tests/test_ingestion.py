@@ -5,14 +5,15 @@ These run in CI — no LLM calls, no network, no PDFs required.
 """
 
 from langchain_core.documents import Document
+
 from ingestion.chunker import (
+    CHUNK_OVERLAP_CHARS,
+    CHUNK_SIZE_CHARS,
     ChunkingStrategy,
     chunk_documents,
     chunk_fixed,
-    chunk_recursive,
     chunk_hierarchical,
-    CHUNK_SIZE_CHARS,
-    CHUNK_OVERLAP_CHARS,
+    chunk_recursive,
 )
 
 

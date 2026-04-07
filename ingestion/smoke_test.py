@@ -15,10 +15,10 @@ Expected output:
     - No errors or empty chunks
 """
 
-from pathlib import Path
 from loguru import logger
-from ingestion.document_loader import load_all_papers
+
 from ingestion.chunker import ChunkingStrategy, chunk_documents, chunk_hierarchical
+from ingestion.document_loader import load_all_papers
 
 
 def run_smoke_test():

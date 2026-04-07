@@ -23,10 +23,9 @@ PROD SCALE (20,000 docs / 800K pages):
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional
 
-from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.metrics import GEval
+from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq

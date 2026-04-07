@@ -14,13 +14,13 @@ Expected output:
     - Metadata showing which papers were cited
 """
 
-from loguru import logger
 from dotenv import load_dotenv
+from loguru import logger
 
-from ingestion.document_loader import load_all_papers
-from ingestion.chunker import ChunkingStrategy, chunk_documents
-from retrieval.vector_store import build_index
 from api.rag_pipeline import run_rag
+from ingestion.chunker import ChunkingStrategy, chunk_documents
+from ingestion.document_loader import load_all_papers
+from retrieval.vector_store import build_index
 
 load_dotenv()
 

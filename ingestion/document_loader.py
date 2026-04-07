@@ -19,7 +19,6 @@ PROD SCALE (20,000 docs / 800K pages):
 - Stream documents into chunker rather than loading all into memory
 """
 
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +26,6 @@ from langchain_core.documents import Document
 from loguru import logger
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
-
 
 PAPERS_DIR = Path(__file__).parent.parent / "data" / "papers"
 

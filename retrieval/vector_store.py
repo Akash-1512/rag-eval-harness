@@ -32,15 +32,12 @@ PROD SCALE (20,000 docs / 800K pages):
 # hybrid BM25+dense retrieval, re-ranking, and horizontal scaling.
 """
 
-import os
-import pickle
 from pathlib import Path
 from typing import Optional
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from loguru import logger
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from retrieval.embedder import get_embedder
 

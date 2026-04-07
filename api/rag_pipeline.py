@@ -41,14 +41,12 @@ PROD SCALE (20,000 docs / 800K pages):
 
 import os
 from functools import lru_cache
-from typing import Optional
 
 from dotenv import load_dotenv
-from langchain_core.documents import Document
+from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from langchain_community.vectorstores import FAISS
 from loguru import logger
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential

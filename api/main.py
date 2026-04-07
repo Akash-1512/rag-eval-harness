@@ -36,11 +36,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from api.schemas import (
+    DeepEvalScores,
     EvaluationRequest,
     EvaluationResponse,
     HealthResponse,
     MetricScores,
-    DeepEvalScores,
     RunSummary,
 )
 
@@ -107,12 +107,12 @@ def run_evaluation(request: EvaluationRequest):
     logger.info(f"Evaluation request: {request.model_dump()}")
 
     try:
-        from ingestion.document_loader import load_all_papers
-        from ingestion.chunker import ChunkingStrategy, chunk_documents
-        from retrieval.vector_store import build_index
         from api.rag_pipeline import run_rag_batch
         from data.qa_pairs.loader import load_qa_pairs
-        from tracking.experiment import log_evaluation_run, EvaluationRunConfig
+        from ingestion.chunker import ChunkingStrategy, chunk_documents
+        from ingestion.document_loader import load_all_papers
+        from retrieval.vector_store import build_index
+        from tracking.experiment import EvaluationRunConfig, log_evaluation_run
 
         # Load papers
         docs = load_all_papers(paper_ids=request.paper_ids)
@@ -155,8 +155,8 @@ def run_evaluation(request: EvaluationRequest):
 
         if request.run_abstention:
             from evaluation.custom_metrics.abstention_accuracy import (
-                evaluate_abstention_accuracy,
                 OUT_OF_SCOPE_QUESTIONS,
+                evaluate_abstention_accuracy,
             )
             oos_qa = [{"question": q, "ground_truth": ""} for q in OUT_OF_SCOPE_QUESTIONS[:3]]
             oos_outputs = run_rag_batch(

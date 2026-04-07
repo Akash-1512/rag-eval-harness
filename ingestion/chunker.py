@@ -130,8 +130,8 @@ def chunk_semantic(
     )
 
     try:
-        from sentence_transformers import SentenceTransformer
         import numpy as np
+        from sentence_transformers import SentenceTransformer
         model = SentenceTransformer("all-MiniLM-L6-v2")
     except ImportError as e:
         logger.error(f"sentence-transformers not installed: {e}")

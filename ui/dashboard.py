@@ -31,8 +31,8 @@ FastAPI + React scales horizontally; Streamlit does not.
 """
 
 import os
+
 import httpx
-import mlflow
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
