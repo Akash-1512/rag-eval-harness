@@ -15,10 +15,10 @@ Expected output:
 """
 
 from loguru import logger
-from ingestion.document_loader import load_all_papers
-from ingestion.chunker import ChunkingStrategy, chunk_documents
-from retrieval.vector_store import build_index, retrieve
 
+from ingestion.chunker import ChunkingStrategy, chunk_documents
+from ingestion.document_loader import load_all_papers
+from retrieval.vector_store import build_index, retrieve
 
 TEST_QUERIES = [
     "How many attention heads does the Transformer base model use?",

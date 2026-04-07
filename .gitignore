@@ -28,3 +28,15 @@ build/
 *.egg-info/
 .ipynb_checkpoints/
 .streamlit/secrets.toml
+
+# Vector store (local demo)
+chroma_db/
+
+# MLflow SQLite backend
+mlflow.db
+
+# DeepEval cache
+.deepeval/
+
+# FAISS docstore pickles (covered by data/indexes/ but safety net)
+*.pkl

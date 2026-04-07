@@ -15,20 +15,20 @@ Usage:
     # Then open http://127.0.0.1:5000 to see logged results
 """
 
-from loguru import logger
 from dotenv import load_dotenv
+from loguru import logger
 
-from ingestion.document_loader import load_all_papers
-from ingestion.chunker import ChunkingStrategy, chunk_documents
-from retrieval.vector_store import build_index
 from api.rag_pipeline import run_rag_batch
-from evaluation.ragas_pipeline.evaluator import run_ragas_evaluation
-from evaluation.deepeval_tests.test_suite import run_deepeval_assertions
 from evaluation.custom_metrics.abstention_accuracy import (
-    evaluate_abstention_accuracy,
     OUT_OF_SCOPE_QUESTIONS,
+    evaluate_abstention_accuracy,
 )
-from tracking.experiment import log_evaluation_run, EvaluationRunConfig
+from evaluation.deepeval_tests.test_suite import run_deepeval_assertions
+from evaluation.ragas_pipeline.evaluator import run_ragas_evaluation
+from ingestion.chunker import ChunkingStrategy, chunk_documents
+from ingestion.document_loader import load_all_papers
+from retrieval.vector_store import build_index
+from tracking.experiment import EvaluationRunConfig, log_evaluation_run
 
 load_dotenv()
 

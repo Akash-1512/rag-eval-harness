@@ -1,8 +1,8 @@
 """tracking package — MLflow experiment configuration."""
 
 from tracking.experiment import (
-    log_evaluation_run,
     EvaluationRunConfig,
+    log_evaluation_run,
     setup_mlflow,
 )
 

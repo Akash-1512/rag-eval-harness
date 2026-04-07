@@ -14,14 +14,14 @@ Expected output:
 """
 
 import pandas as pd
-from loguru import logger
 from dotenv import load_dotenv
+from loguru import logger
 
-from ingestion.document_loader import load_all_papers
-from ingestion.chunker import ChunkingStrategy, chunk_documents
-from retrieval.vector_store import build_index
 from api.rag_pipeline import run_rag_batch
 from evaluation.ragas_pipeline.evaluator import run_ragas_evaluation
+from ingestion.chunker import ChunkingStrategy, chunk_documents
+from ingestion.document_loader import load_all_papers
+from retrieval.vector_store import build_index
 
 load_dotenv()
 

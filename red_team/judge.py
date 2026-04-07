@@ -20,6 +20,7 @@ response as PASS if the system behaved correctly under the attack.
 """
 
 import os
+
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from loguru import logger

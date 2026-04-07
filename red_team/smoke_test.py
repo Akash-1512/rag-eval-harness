@@ -8,21 +8,21 @@ Usage:
     python -m red_team.smoke_test
 """
 
-from loguru import logger
 from dotenv import load_dotenv
+from loguru import logger
 
-from ingestion.document_loader import load_all_papers
 from ingestion.chunker import ChunkingStrategy, chunk_documents
-from retrieval.vector_store import build_index
-from red_team.attack_types import (
-    VERSION_CONFUSION_ATTACKS,
-    NUMERICAL_PROBE_ATTACKS,
-    PREMISE_INJECTION_ATTACKS,
-    CROSS_DOC_SYNTHESIS_ATTACKS,
-    OUT_OF_SCOPE_ATTACKS,
-    TEMPORAL_VERSION_ATTACKS,
-)
+from ingestion.document_loader import load_all_papers
 from red_team.agent import run_red_team_agent
+from red_team.attack_types import (
+    CROSS_DOC_SYNTHESIS_ATTACKS,
+    NUMERICAL_PROBE_ATTACKS,
+    OUT_OF_SCOPE_ATTACKS,
+    PREMISE_INJECTION_ATTACKS,
+    TEMPORAL_VERSION_ATTACKS,
+    VERSION_CONFUSION_ATTACKS,
+)
+from retrieval.vector_store import build_index
 
 load_dotenv()
 

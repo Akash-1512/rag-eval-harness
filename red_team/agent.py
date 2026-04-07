@@ -27,16 +27,15 @@ PROD SCALE (20,000 docs / 800K pages):
 # This makes the red-team agent production-aware rather than synthetic.
 """
 
-import os
 from dataclasses import dataclass, field
 from typing import TypedDict
 
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
 from loguru import logger
 
-from red_team.attack_types import AttackPrompt, AttackType, ALL_ATTACKS
+from red_team.attack_types import ALL_ATTACKS, AttackPrompt
 from red_team.judge import judge_response
 
 load_dotenv()

@@ -27,11 +27,9 @@ import json
 import os
 import tempfile
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 import mlflow
-import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
 

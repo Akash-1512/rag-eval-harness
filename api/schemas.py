@@ -15,8 +15,9 @@ Add versioned schemas (V1EvaluationRequest, V2EvaluationRequest)
 to support API version upgrades without breaking existing clients.
 """
 
-from pydantic import BaseModel, Field
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class EvaluationRequest(BaseModel):

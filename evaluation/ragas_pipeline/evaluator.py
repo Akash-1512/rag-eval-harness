@@ -35,9 +35,10 @@ import pandas as pd
 from datasets import Dataset
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
 from loguru import logger
 from ragas import evaluate
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import (
     answer_correctness,
     answer_relevancy,
@@ -45,8 +46,6 @@ from ragas.metrics import (
     context_recall,
     faithfulness,
 )
-from ragas.llms import LangchainLLMWrapper
-from ragas.embeddings import LangchainEmbeddingsWrapper
 
 from api.rag_pipeline import RAGOutput
 
