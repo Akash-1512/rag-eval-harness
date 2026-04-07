@@ -44,7 +44,7 @@ from loguru import logger
 class LocalEmbedder(Embeddings):
     """
     LangChain-compatible wrapper around sentence-transformers.
-    
+
     DEMO (zero budget): all-MiniLM-L6-v2 — local CPU, zero API cost.
     PROD (paid): AzureOpenAIEmbeddings with text-embedding-3-large.
 
