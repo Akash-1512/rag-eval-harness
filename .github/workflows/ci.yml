@@ -2,56 +2,83 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop, "feature/**", "fix/**", "refactor/**", "docs/**", "ci/**", "chore/**"]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
-  validate:
+
+  lint:
+    name: Lint (ruff)
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
 
-      - name: Install core dependencies only
+      - name: Install ruff
+        run: pip install ruff==0.4.4
+
+      - name: Run ruff — check formatting and style
+        run: ruff check . --select "E,F,W,I" --ignore "E501"
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install \
-            langchain>=0.3.0 \
-            langchain-groq>=0.2.0 \
-            langchain-community>=0.3.0 \
-            langchain-openai>=0.2.0 \
-            langgraph>=0.2.28 \
-            openai>=1.51.2 \
-            pypdf>=4.3.1 \
-            python-docx>=1.1.2 \
-            faiss-cpu>=1.9.0.post1 \
-            python-dotenv>=1.0.1 \
-            pydantic>=2.9.2 \
-            loguru>=0.7.2 \
-            tenacity>=8.1.0 \
-            pytest>=8.3.3
+          pip install -r requirements.txt
 
-      - name: Verify core imports
+      - name: Run unit tests with coverage
+        # NOTE: no || echo fallback — real failures must fail CI
+        run: pytest tests/ -v --tb=short --cov=. --cov-report=xml --cov-report=term-missing
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MLFLOW_TRACKING_URI: "sqlite:///tmp/mlflow_ci.db"
+
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: false   # coverage upload failure != test failure
+
+  quality-gate:
+    name: Quality Gate (RAGAS thresholds)
+    runs-on: ubuntu-latest
+    needs: test
+    # Only runs on develop and main — not on every feature branch push
+    # Reason: quality gate makes real LLM calls (~3 min, uses Groq quota)
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
         run: |
-          python -c "import langchain; print('langchain ok')"
-          python -c "import langgraph; print('langgraph ok')"
-          python -c "import faiss; print('faiss ok')"
-          python -c "import pypdf; print('pypdf ok')"
-          python -c "import loguru; print('loguru ok')"
-          python -c "import pydantic; print('pydantic ok')"
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run ingestion unit tests
-        run: |
-          pytest tests/ -v --tb=short 2>/dev/null || echo "No tests yet — add tests in Milestone 5"
-
-  # Heavy packages (torch, sentence-transformers, mlflow) tested separately
-  # to keep the core CI fast. These are integration tests run on demand.
-  # PROD: add a nightly workflow that runs the full integration test suite.
+      - name: Run RAGAS quality gate
+        # Exit code 1 fails CI if faithfulness < 0.75 or context_recall < 0.60
+        run: python tests/quality_gate.py
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MLFLOW_TRACKING_URI: "sqlite:///tmp/mlflow_ci.db"
