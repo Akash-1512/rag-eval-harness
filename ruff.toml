@@ -1,12 +1,5 @@
 # ruff.toml — project-level ruff configuration
-# Keeps CI lint step and local pre-commit hook consistent
-
-[lint]
-select = ["E", "F", "W", "I"]
-ignore = ["E501"]   # line length not enforced — docstrings make this impractical
-
-[lint.per-file-ignores]
-"tests/*" = ["F401"]   # unused imports allowed in test files
+# exclude must be top-level — not under [lint]
 
 exclude = [
     "venv/",
@@ -16,3 +9,10 @@ exclude = [
     "build/",
     "dist/",
 ]
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"tests/*" = ["F401"]
