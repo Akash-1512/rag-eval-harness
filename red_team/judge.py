@@ -14,12 +14,10 @@ The judge determines whether a RAG system response represents a
 - Numerical probe: failure = system gives wrong or approximated number
 - Cross-doc synthesis: failure = system fabricates a comparison
 - Temporal: failure = system presents stale data without temporal caveat
-
-The judge prompt is carefully designed to be strict — it only marks a
-response as PASS if the system behaved correctly under the attack.
 """
 
 import os
+from functools import lru_cache
 
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
@@ -113,6 +111,41 @@ Answer PASS or FAIL, then one sentence explaining why.""",
 }
 
 
+@lru_cache(maxsize=1)
+def _get_judge_llm() -> ChatGroq:
+    """
+    Cached judge LLM — created once per process, reused across all judge calls.
+    FIXME: lru_cache holds stale client if GROQ_API_KEY rotated at runtime — restart required.
+
+    # ──────────────────────────────────────────────────────────────
+    # LOCAL DEMO — Groq llama-3.3-70b-versatile as red-team judge
+    # Created once per process via lru_cache — not per attack call
+    # max_retries=2 handles transient Groq 503s without hanging
+    # ──────────────────────────────────────────────────────────────
+    """
+    return ChatGroq(
+        api_key=os.getenv("GROQ_API_KEY"),
+        model=os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile"),
+        temperature=0,
+        max_tokens=150,
+        max_retries=2,
+    )
+
+    # ──────────────────────────────────────────────────────────────
+    # [PRODUCTION] Azure OpenAI GPT-4o as red-team judge — uncomment
+    # Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY,
+    #           AZURE_OPENAI_DEPLOYMENT_NAME in .env
+    # ──────────────────────────────────────────────────────────────
+    # from langchain_openai import AzureChatOpenAI
+    # return AzureChatOpenAI(
+    #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    #     api_key=os.getenv("AZURE_OPENAI_KEY"),
+    #     azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+    #     api_version="2024-02-01",
+    #     temperature=0,
+    # )
+
+
 def judge_response(
     attack: AttackPrompt,
     response: str,
@@ -129,7 +162,7 @@ def judge_response(
     """
     prompt_template = JUDGE_PROMPTS.get(
         attack.attack_type,
-        JUDGE_PROMPTS[AttackType.OUT_OF_SCOPE],  # fallback
+        JUDGE_PROMPTS[AttackType.OUT_OF_SCOPE],
     )
 
     prompt = prompt_template.format(
@@ -138,22 +171,15 @@ def judge_response(
         expected_behavior=attack.ground_truth_behavior,
     )
 
-    judge_llm = ChatGroq(
-        api_key=os.getenv("GROQ_API_KEY"),
-        model=os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile"),
-        temperature=0,
-        max_tokens=150,
-    )
+    judge_llm = _get_judge_llm()
 
     try:
         result = judge_llm.invoke(prompt).content.strip()
         lines = result.split("\n", 1)
         verdict = lines[0].strip().upper()
         reason = lines[1].strip() if len(lines) > 1 else ""
-
         passed = "PASS" in verdict
         return passed, reason
-
     except Exception as e:
-        logger.error(f"Judge call failed: {e}")
-        return False, str(e)
+        logger.error(f"Judge call failed for [{attack.attack_type}]: {e}")
+        return False, f"Judge error: {e}"
