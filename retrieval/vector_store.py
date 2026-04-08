@@ -19,17 +19,7 @@ Why FAISS fails at production scale:
 - No filtering: cannot filter by metadata (e.g. "only search paper_id=03_gpt3")
 - No incremental updates: adding one doc requires re-building the full index
 
-PROD SCALE (20,000 docs / 800K pages):
-# from langchain_community.vectorstores import AzureSearch
-# vector_store = AzureSearch(
-#     azure_search_endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),
-#     azure_search_key=os.getenv("AZURE_SEARCH_KEY"),
-#     index_name=os.getenv("AZURE_SEARCH_INDEX_NAME"),
-#     embedding_function=embedder.embed_query,
-#     search_type="hybrid",  # BM25 + dense vectors combined
-# )
-# Azure AI Search handles: incremental updates, metadata filtering,
-# hybrid BM25+dense retrieval, re-ranking, and horizontal scaling.
+TODO: FAISS IndexFlatL2 does exact search — switch to IndexIVFFlat for >50K vectors
 """
 
 from pathlib import Path
@@ -76,12 +66,17 @@ def build_index(
     target_dir = (index_dir or INDEX_DIR) / strategy_name
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    embedder = get_embedder()
-
     logger.info(
         f"Building FAISS index: {len(chunks)} chunks "
         f"(strategy={strategy_name})"
     )
+
+    # ──────────────────────────────────────────────────────────────
+    # LOCAL DEMO — FAISS with sentence-transformers all-MiniLM-L6-v2
+    # Zero cost, zero infrastructure, persisted to data/indexes/
+    # Exact L2 search — finds true nearest neighbours every time
+    # ──────────────────────────────────────────────────────────────
+    embedder = get_embedder()
 
     try:
         vector_store = FAISS.from_documents(
@@ -91,6 +86,29 @@ def build_index(
     except Exception as e:
         logger.error(f"Failed to build FAISS index: {e}")
         raise RuntimeError(f"Index construction failed: {e}") from e
+
+    # ──────────────────────────────────────────────────────────────
+    # [PRODUCTION] Azure AI Search hybrid index — uncomment
+    # Requires: AZURE_SEARCH_ENDPOINT, AZURE_SEARCH_KEY,
+    #           AZURE_SEARCH_INDEX_NAME, AZURE_OPENAI_* in .env
+    # Handles: incremental updates, metadata filtering,
+    #          hybrid BM25+dense retrieval, re-ranking, horizontal scaling
+    # ──────────────────────────────────────────────────────────────
+    # from langchain_community.vectorstores import AzureSearch
+    # from langchain_openai import AzureOpenAIEmbeddings
+    # embedder = AzureOpenAIEmbeddings(
+    #     azure_deployment=os.getenv("AZURE_EMBEDDING_DEPLOYMENT"),
+    #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    #     api_key=os.getenv("AZURE_OPENAI_KEY"),
+    # )
+    # vector_store = AzureSearch(
+    #     azure_search_endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),
+    #     azure_search_key=os.getenv("AZURE_SEARCH_KEY"),
+    #     index_name=os.getenv("AZURE_SEARCH_INDEX_NAME"),
+    #     embedding_function=embedder.embed_query,
+    #     search_type="hybrid",  # BM25 + dense vectors — 15-25% better recall
+    # )
+    # return vector_store  # Azure Search does not need save_index()
 
     save_index(vector_store, strategy_name, index_dir)
 
@@ -125,7 +143,7 @@ def load_index(
     """
     Load a previously saved FAISS index from disk.
 
-    Use this instead of rebuild_index() when running repeated
+    Use this instead of build_index() when running repeated
     evaluation experiments — avoids re-embedding the entire corpus.
 
     Args:
@@ -172,55 +190,56 @@ def retrieve(
     """
     Retrieve top-k most relevant chunks for a query.
 
-    This is the function called by the RAG pipeline for every question.
-    The returned documents become the context passed to the LLM and
-    to every RAGAS metric.
-
     Args:
         query: User question string
         vector_store: Loaded FAISS index
         top_k: Number of chunks to retrieve (default 5)
         score_threshold: Optional minimum similarity score (0-1).
-                         Chunks below this score are filtered out.
 
     Returns:
-        List of Document objects ordered by relevance (most relevant first)
+        List of Document objects ordered by relevance
 
     RAGAS CONTEXT NOTE:
     top_k=5 is the recommended default. Too few (top_k=2) hurts Context
     Recall. Too many (top_k=10) hurts Context Precision with noise.
     MLflow tracks top_k as a parameter so you can experiment with it.
-
-    PROD SCALE (20,000 docs / 800K pages):
-    # Azure AI Search hybrid retrieval with re-ranking:
-    # results = vector_store.similarity_search_with_relevance_scores(
-    #     query, k=top_k, score_threshold=score_threshold,
-    #     search_type="hybrid"  # BM25 + dense combined
-    # )
     """
     if not query or not query.strip():
         raise ValueError("Query cannot be empty")
 
     logger.debug(f"Retrieving top-{top_k} chunks for: {query[:80]}...")
 
+    # ──────────────────────────────────────────────────────────────
+    # LOCAL DEMO — FAISS dense similarity search
+    # Exact L2 distance — no approximation, no BM25 component
+    # ──────────────────────────────────────────────────────────────
     try:
         if score_threshold is not None:
             results = vector_store.similarity_search_with_relevance_scores(
                 query, k=top_k
             )
-            docs = [
+            retrieved_chunks = [
                 doc for doc, score in results
                 if score >= score_threshold
             ]
             logger.debug(
-                f"Retrieved {len(docs)} chunks "
+                f"Retrieved {len(retrieved_chunks)} chunks "
                 f"(filtered from {len(results)} by threshold={score_threshold})"
             )
         else:
-            docs = vector_store.similarity_search(query, k=top_k)
-            logger.debug(f"Retrieved {len(docs)} chunks")
+            retrieved_chunks = vector_store.similarity_search(query, k=top_k)
+            logger.debug(f"Retrieved {len(retrieved_chunks)} chunks")
 
-        return docs
+        # ──────────────────────────────────────────────────────────
+        # [PRODUCTION] Azure AI Search hybrid retrieval — uncomment
+        # 15-25% better recall than dense-only on domain-specific corpora
+        # ──────────────────────────────────────────────────────────
+        # retrieved_chunks = vector_store.similarity_search(
+        #     query, k=top_k,
+        #     search_type="hybrid",   # BM25 + dense combined via RRF scoring
+        # )
+
+        return retrieved_chunks
 
     except Exception as e:
         logger.error(f"Retrieval failed for query '{query[:50]}...': {e}")
