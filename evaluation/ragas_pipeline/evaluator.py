@@ -117,13 +117,13 @@ class SingleGenerationGroq(ChatGroq):
     """
     Groq wrapper that caps n=1 for models that reject n>1.
     RAGAS answer_relevancy sends n=3 by default to generate
-    multiple hypothetical questions. qwen3-32b rejects this.
+    multiple hypothetical questions. Groq rejects this.
     This subclass forces n=1 on every call.
 
     PROD (Azure OpenAI): supports n>1 natively, no wrapper needed.
     """
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        kwargs.pop("n", None)  # remove n parameter entirely
+        kwargs.pop("n", None)
         return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
@@ -132,58 +132,70 @@ class SingleGenerationGroq(ChatGroq):
 
 
 def _get_ragas_llm() -> LangchainLLMWrapper:
-    """
-    Returns RAGAS-wrapped LLM for metric computation.
+    """Returns RAGAS-wrapped LLM for metric computation."""
+    # TODO: add async RAGAS eval — currently blocks ~45s per question on Groq free tier
+    # Each metric makes ~3 sequential LLM calls; 10 questions x 5 metrics = ~150 calls total
 
-    RAGAS uses this LLM to:
-    - Decompose answers into atomic claims (faithfulness)
-    - Generate hypothetical questions from answers (answer relevance)
-    - Compare answer claims to ground truth (answer correctness)
-
-    DEMO (zero budget): Groq llama-3.1-70b-versatile
-    PROD (paid):
-    # from langchain_openai import AzureChatOpenAI
-    # llm = AzureChatOpenAI(
-    #     azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
-    #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    #     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    #     api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    #     temperature=0,
-    # )
-    """
     api_key = os.getenv("GROQ_API_KEY")
-    model = os.getenv("GROQ_MODEL_NAME", "llama-3.1-70b-versatile")
-
     if not api_key:
-        raise ValueError("GROQ_API_KEY not set in .env")
+        raise ValueError("GROQ_API_KEY not set in .env — required for RAGAS judge calls")
 
-    # DEMO: SingleGenerationGroq caps n=1 for models that reject n>1
-    # PROD (Azure OpenAI): use standard ChatOpenAI — supports n>1 natively
+    # ──────────────────────────────────────────────────────────────
+    # LOCAL DEMO — Groq mixtral-8x7b-32768 as RAGAS judge (zero cost)
+    # mixtral chosen over llama3-8b: larger context window (32K vs 8K)
+    # handles long retrieved chunks without truncation during eval
+    # SingleGenerationGroq caps n=1 — Groq rejects n>1 (RAGAS default)
+    # ──────────────────────────────────────────────────────────────
     llm = SingleGenerationGroq(
         api_key=api_key,
-        model=model,
+        model="mixtral-8x7b-32768",
         temperature=0,
+        max_retries=3,
     )
+
+    # ──────────────────────────────────────────────────────────────
+    # [PRODUCTION] Azure OpenAI GPT-4o as RAGAS judge — uncomment
+    # Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY,
+    #           AZURE_OPENAI_DEPLOYMENT_NAME in .env
+    # GPT-4o supports n>1 natively — remove SingleGenerationGroq wrapper
+    # ──────────────────────────────────────────────────────────────
+    # from langchain_openai import AzureChatOpenAI
+    # llm = AzureChatOpenAI(
+    #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    #     api_key=os.getenv("AZURE_OPENAI_KEY"),
+    #     azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+    #     api_version="2024-02-01",
+    #     temperature=0,
+    # )
+
     return LangchainLLMWrapper(llm)
 
 
 def _get_ragas_embedder() -> LangchainEmbeddingsWrapper:
-    """
-    Returns RAGAS-wrapped embedder for answer relevance metric.
-    Answer relevance uses embeddings to compute semantic similarity
-    between the original question and LLM-generated reverse questions.
+    """Returns RAGAS-wrapped embedder for answer relevance metric."""
 
-    DEMO (zero budget): local sentence-transformers
-    PROD (paid):
-    # from langchain_openai import AzureOpenAIEmbeddings
-    # embeddings = AzureOpenAIEmbeddings(
-    #     azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
-    #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    #     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    # )
-    """
+    # ──────────────────────────────────────────────────────────────
+    # LOCAL DEMO — sentence-transformers all-MiniLM-L6-v2 (zero cost)
+    # Runs locally, no API key needed, ~90MB download on first run
+    # Used by answer_relevancy to compute semantic similarity between
+    # original question and LLM-generated reverse questions
+    # ──────────────────────────────────────────────────────────────
     from retrieval.embedder import LocalEmbedder
     embedder = LocalEmbedder()
+
+    # ──────────────────────────────────────────────────────────────
+    # [PRODUCTION] Azure OpenAI text-embedding-3-large — uncomment
+    # Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY,
+    #           AZURE_EMBEDDING_DEPLOYMENT in .env
+    # 3072-dim embeddings vs 384-dim local — measurably better recall
+    # ──────────────────────────────────────────────────────────────
+    # from langchain_openai import AzureOpenAIEmbeddings
+    # embedder = AzureOpenAIEmbeddings(
+    #     azure_deployment=os.getenv("AZURE_EMBEDDING_DEPLOYMENT"),
+    #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    #     api_key=os.getenv("AZURE_OPENAI_KEY"),
+    # )
+
     return LangchainEmbeddingsWrapper(embedder)
 
 
@@ -207,13 +219,11 @@ def run_ragas_evaluation(
         RAGEvaluationResult with aggregate and per-question scores
 
     Raises:
-        ValueError: If rag_outputs is empty or missing ground_truth
-                    for metrics that require it
+        ValueError: If rag_outputs is empty or all outputs contain errors
     """
     if not rag_outputs:
         raise ValueError("rag_outputs list is empty — run RAG pipeline first")
 
-    # Filter out any errored outputs
     valid_outputs = [o for o in rag_outputs if "error" not in o.metadata]
     if not valid_outputs:
         raise ValueError("All RAG outputs contain errors — check RAG pipeline")
@@ -223,7 +233,6 @@ def run_ragas_evaluation(
             f"Skipping {len(rag_outputs) - len(valid_outputs)} errored outputs"
         )
 
-    # Default to all 5 metrics
     if metrics is None:
         metrics = [
             faithfulness,
@@ -233,7 +242,6 @@ def run_ragas_evaluation(
             answer_correctness,
         ]
 
-    # Check ground truth availability for metrics that need it
     needs_ground_truth = [context_recall, answer_correctness]
     if any(m in metrics for m in needs_ground_truth):
         missing_gt = [o for o in valid_outputs if not o.ground_truth]
@@ -248,8 +256,6 @@ def run_ragas_evaluation(
         f"{len(metrics)} metrics"
     )
 
-    # Build RAGAS dataset
-    # RAGAS 0.2.x expects a HuggingFace Dataset with these exact column names
     dataset_dict = {
         "question": [o.question for o in valid_outputs],
         "answer": [o.answer for o in valid_outputs],
@@ -260,27 +266,25 @@ def run_ragas_evaluation(
 
     logger.info("Dataset prepared — starting RAGAS scoring...")
 
-    # Configure LLM and embedder for RAGAS
     ragas_llm = _get_ragas_llm()
     ragas_embedder = _get_ragas_embedder()
 
-    # Inject LLM and embedder into each metric
     for metric in metrics:
         if hasattr(metric, "llm"):
             metric.llm = ragas_llm
         if hasattr(metric, "embeddings"):
             metric.embeddings = ragas_embedder
 
-    # Run evaluation
     # RunConfig controls concurrency and timeout — critical for Groq free tier
-    # DEMO: max_workers=1 prevents rate limit timeouts on Groq free tier
-    # PROD: increase to max_workers=4 with Azure OpenAI which handles concurrency
+    # LOCAL DEMO: max_workers=1 — sequential to avoid Groq rate limits
+    # [PRODUCTION] Azure OpenAI: increase to max_workers=4
     from ragas import RunConfig
     run_config = RunConfig(
-        max_workers=1,      # sequential to avoid Groq rate limits
-        timeout=120,        # 2 min per metric call
+        max_workers=1,
+        timeout=120,
         max_retries=3,
     )
+
     try:
         results = evaluate(
             dataset=dataset,
@@ -291,18 +295,14 @@ def run_ragas_evaluation(
         logger.error(f"RAGAS evaluation failed: {e}")
         raise
 
-    # Extract scores
     scores_df = results.to_pandas()
-
     logger.info("RAGAS scoring complete")
 
-    # Build result object with safe .get() for missing metrics
     def safe_mean(col: str) -> float:
         if col in scores_df.columns:
             return float(scores_df[col].mean())
         return 0.0
 
-    # Extract run metadata from first valid output
     meta = valid_outputs[0].metadata
 
     result = RAGEvaluationResult(
@@ -321,7 +321,3 @@ def run_ragas_evaluation(
 
     logger.success(f"\n{result.summary()}")
     return result
-
-
-
-
